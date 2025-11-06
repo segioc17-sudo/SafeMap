@@ -1,4 +1,3 @@
-// App.jsx
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   MapContainer,
@@ -261,8 +260,8 @@ const styles = {
   // Botones flotantes
   geoBtn: {
     position: "absolute",
-    top: 120,
-    right: 12,
+    top: 64,
+    right: 16 + 40,
     zIndex: 3500,
     padding: "12px 14px",
     borderRadius: 16,
@@ -276,8 +275,8 @@ const styles = {
   },
   viaBtn: {
     position: "absolute",
-    top: 180,
-    right: 8,
+    top: 120,
+    right: 16,
     zIndex: 3500,
     padding: "12px 14px",
     borderRadius: 16,
@@ -288,30 +287,6 @@ const styles = {
     boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
     backdropFilter: "blur(6px)",
     touchAction: "manipulation",
-  },
-
-  // ====== NUEVOS ESTILOS: barra minimizada y botón ======
-  miniBar: {
-    position: "absolute",
-    zIndex: 9999,
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "8px 10px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "rgba(8,10,14,0.9)",
-    color: "#e6eef8",
-    boxShadow: "0 8px 24px rgba(2,6,23,0.7)",
-  },
-
-  miniToggleBtn: {
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(2,10,28,0.9)",
-    color: "#e6eef8",
-    borderRadius: 10,
-    padding: "8px 10px",
-    cursor: "pointer",
   },
 };
 
@@ -690,10 +665,6 @@ export default function App() {
 
   // Panel inferior ("summary" | "instructions")
   const [bottomMode, setBottomMode] = useState("summary");
-
-  // ⭐ NUEVO: Minimizar / Expandir panel inferior (persistente)
-  const [isAlertMinimized, setIsAlertMinimized] = useState(getLS("alertMinimized", false));
-  useEffect(() => { setLS("alertMinimized", isAlertMinimized); }, [isAlertMinimized]);
 
   // Coordenada del paso bajo hover
   const [hoveredStepLatLng, setHoveredStepLatLng] = useState(null);
@@ -1581,7 +1552,7 @@ export default function App() {
           {startLoc && <Marker position={startLoc}><Popup>Inicio</Popup></Marker>}
           {endLoc && <Marker position={endLoc}><Popup>Destino</Popup></Marker>}
 
-          {/* ⭐ Marker de PARADA */}
+          {/* ⭐ Marker de PARADA (morado, arrastrable, clic derecho para borrar) */}
           {viaPoints.length > 0 && (
             <Marker
               position={viaPoints[0]}
@@ -1699,7 +1670,7 @@ export default function App() {
           )}
         </MapContainer>
 
-        {/* Panel inferior (minimizable) */}
+        {/* Panel inferior */}
         {(previewRoute || route) && (
           (() => {
             const isActive = isStarted;
@@ -1723,89 +1694,7 @@ export default function App() {
                 : "";
 
             const showAltBtn = /ALTO|MEDIO/.test(lbl) && startLoc && endLoc;
-            const showStartBtn = !!previewRoute && !isStarted;
 
-            // Posicionamiento común para la barra minimizada
-            const miniPosStyle = {
-              left: isMobile ? 8 : bottomPanelLeft,
-              right: isMobile ? 8 : 12,
-              bottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + 8px)" : 14,
-            };
-
-            if (isAlertMinimized) {
-              // ======== VISTA MINIMIZADA ========
-              return (
-                <div
-                  style={{ ...styles.miniBar, ...miniPosStyle, justifyContent: "space-between" }}
-                  className={`${clsPanel}`}
-                  role="region"
-                  aria-label="Panel de alertas minimizado"
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className={`chip level ${chipPulseClass}`} title={`Nivel ${lbl}`}>
-                      <span className={`dot ${levelKey}`} /> {lbl}
-                    </span>
-                    <span className="chip" title="Resumen distancia/tiempo">
-                      🛣️ {dist} • ⏱️ {tim}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {/* Iniciar desde mini-bar (si aplica) */}
-                    {showStartBtn && (
-                      <button
-                        className="btn-primary"
-                        style={{ padding: "8px 10px", borderRadius: 10 }}
-                        onClick={() => {
-                          if (!previewRoute) return alert("Traza primero una ruta (elige inicio y destino).");
-                          setIsStarted(true);
-                          setRoute(null);
-                          setInstructions([]);
-                          setActiveInstructionIndex(0);
-                          setBottomMode("instructions");
-                          setViaMode(false);
-                        }}
-                        title="Iniciar navegación"
-                      >
-                        ▶ Iniciar
-                      </button>
-                    )}
-
-                    {/* Ruta alterna cuando aplica */}
-                    {showAltBtn && (
-                      <button
-                        className="btn-alt"
-                        style={{ padding: "8px 10px", borderRadius: 10 }}
-                        onClick={() => {
-                          const via = suggestAlternateVia();
-                          if (!via) return alert("No encontré una vía alternativa adecuada.");
-                          setViaPoints([via]);
-                          setIsStarted(true);
-                          setBottomMode("instructions");
-                          setViaMode(false);
-                        }}
-                        title="Ruta alterna"
-                      >
-                        ↺ Alterna
-                      </button>
-                    )}
-
-                    {/* Botón restaurar */}
-                    <button
-                      type="button"
-                      style={styles.miniToggleBtn}
-                      onClick={() => setIsAlertMinimized(false)}
-                      title="Expandir panel de alertas"
-                      aria-label="Expandir panel de alertas"
-                    >
-                      ⤢ Expandir
-                    </button>
-                  </div>
-                </div>
-              );
-            }
-
-            // ======== VISTA COMPLETA ========
             const bottomPanelStyle = {
               ...styles.bottomPanel,
               left: isMobile ? 8 : bottomPanelLeft,
@@ -1864,17 +1753,6 @@ export default function App() {
                     >
                       🧩 Resumen
                     </span>
-
-                    {/* Botón para minimizar */}
-                    <button
-                      type="button"
-                      style={{ ...styles.miniToggleBtn }}
-                      onClick={() => setIsAlertMinimized(true)}
-                      title="Minimizar panel de alertas"
-                      aria-label="Minimizar panel de alertas"
-                    >
-                      ⤡ Minimizar
-                    </button>
                   </div>
 
                   {bottomMode === "instructions" ? (
@@ -1952,26 +1830,6 @@ export default function App() {
                     <div className="label">Tiempo</div>
                     <div className="value">{tim}</div>
                   </div>
-
-                  {/* Botones de acción */}
-                  {showStartBtn && (
-                    <button
-                      className="btn-primary"
-                      style={{ padding: "10px 12px", borderRadius: 10, width: isMobile ? "100%" : "auto" }}
-                      onClick={() => {
-                        if (!previewRoute) return alert("Traza primero una ruta (elige inicio y destino).");
-                        setIsStarted(true);
-                        setRoute(null);
-                        setInstructions([]);
-                        setActiveInstructionIndex(0);
-                        setBottomMode("instructions");
-                        setViaMode(false);
-                      }}
-                      title="Iniciar navegación (i)"
-                    >
-                      Iniciar
-                    </button>
-                  )}
 
                   {showAltBtn && (
                     <button
