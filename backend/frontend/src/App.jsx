@@ -1,3 +1,4 @@
+// App.jsx
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   MapContainer,
@@ -33,6 +34,18 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+// ⭐ Icono morado para PARADA
+const viaIcon = L.divIcon({
+  className: "via-icon",
+  html: `<div style="
+    width:24px;height:24px;border-radius:50%;
+    background:#a78bfa;border:2px solid #fff;
+    box-shadow:0 2px 10px rgba(0,0,0,.35);
+  "></div>`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
 });
 
 // ================== Cliente API ==================
@@ -197,7 +210,7 @@ const styles = {
     cursor: "pointer",
     boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
     outline: "none",
-    transition: "transform .08s ease, box-shadow .2s ease, background .2s ease",
+    transition: "transform .08s ease, box-shadow .2s ease, background .2s.ease",
     backdropFilter: "blur(6px)",
     touchAction: "manipulation",
   },
@@ -215,7 +228,7 @@ const styles = {
     display: "flex",
     gap: 14,
     alignItems: "stretch",
-    transition: "transform .2s ease, opacity .2s ease, left .25s ease",
+    transition: "transform .2s ease, opacity .2s ease, left .25s.ease",
     border: "1px solid rgba(255,255,255,0.08)",
     minWidth: 320,
     maxWidth: "min(92vw, 920px)",
@@ -245,11 +258,11 @@ const styles = {
   },
   chipTab: { cursor: "pointer", userSelect: "none" },
 
-  // Geolocate floating btn
+  // Botones flotantes
   geoBtn: {
     position: "absolute",
-    top: 64,
-    right: 16 + 40,
+    top: 120,
+    right: 12,
     zIndex: 3500,
     padding: "12px 14px",
     borderRadius: 16,
@@ -260,6 +273,45 @@ const styles = {
     boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
     backdropFilter: "blur(6px)",
     touchAction: "manipulation",
+  },
+  viaBtn: {
+    position: "absolute",
+    top: 180,
+    right: 8,
+    zIndex: 3500,
+    padding: "12px 14px",
+    borderRadius: 16,
+    border: "2px solid rgba(255,255,255,0.9)",
+    background: "rgba(2,10,28,0.9)",
+    color: "#e6eef8",
+    cursor: "pointer",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+    backdropFilter: "blur(6px)",
+    touchAction: "manipulation",
+  },
+
+  // ====== NUEVOS ESTILOS: barra minimizada y botón ======
+  miniBar: {
+    position: "absolute",
+    zIndex: 9999,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 10px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(8,10,14,0.9)",
+    color: "#e6eef8",
+    boxShadow: "0 8px 24px rgba(2,6,23,0.7)",
+  },
+
+  miniToggleBtn: {
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(2,10,28,0.9)",
+    color: "#e6eef8",
+    borderRadius: 10,
+    padding: "8px 10px",
+    cursor: "pointer",
   },
 };
 
@@ -431,6 +483,15 @@ function MapClickHandler({ onSetStart, onSetEnd }) {
       onSetEnd([e.latlng.lat, e.latlng.lng]);
       stateRef.current = 0;
     }
+  });
+  return null;
+}
+
+// ⭐ Colocar/actualizar PARADA con un clic cuando viaMode está activo
+function MapViaSetter({ active, onSetVia }) {
+  useMapEvent("click", (e) => {
+    if (!active) return;
+    onSetVia([e.latlng.lat, e.latlng.lng]);
   });
   return null;
 }
@@ -630,6 +691,10 @@ export default function App() {
   // Panel inferior ("summary" | "instructions")
   const [bottomMode, setBottomMode] = useState("summary");
 
+  // ⭐ NUEVO: Minimizar / Expandir panel inferior (persistente)
+  const [isAlertMinimized, setIsAlertMinimized] = useState(getLS("alertMinimized", false));
+  useEffect(() => { setLS("alertMinimized", isAlertMinimized); }, [isAlertMinimized]);
+
   // Coordenada del paso bajo hover
   const [hoveredStepLatLng, setHoveredStepLatLng] = useState(null);
 
@@ -639,8 +704,9 @@ export default function App() {
   // voz
   const { supported: voiceSupported, voicesReady, speak, stop } = useVoice("es-CO", 1, 1);
 
-  // via points
+  // ⭐ PARADAS (waypoints) y modo colocar
   const [viaPoints, setViaPoints] = useState([]);
+  const [viaMode, setViaMode] = useState(false);
 
   // ======= Hook de audio de alerta =======
   const { playPattern } = useAlertAudio({ cooldownMs: 15000 });
@@ -967,7 +1033,8 @@ export default function App() {
     setEndLoc(null);
     setBottomMode("summary");
     setHoveredStepLatLng(null);
-    setViaPoints([]);
+    setViaPoints([]); // limpiar parada
+    setViaMode(false);
     setLS("startLoc", startLoc);
   }, [stop, startLoc]);
 
@@ -981,7 +1048,8 @@ export default function App() {
     setRiskLevel("—");
     setBottomMode("summary");
     setHoveredStepLatLng(null);
-    setViaPoints([]);
+    setViaPoints([]); // reset parada
+    setViaMode(false);
   }, [startLoc?.[0], startLoc?.[1], endLoc?.[0], endLoc?.[1], mode]);
 
   // ======= Persistencia de preferencias =======
@@ -1024,10 +1092,13 @@ export default function App() {
         setInstructions([]);
         setActiveInstructionIndex(0);
         setBottomMode("instructions");
+        setViaMode(false);
       } else if (e.key.toLowerCase() === "c") {
         clearRoute();
       } else if (e.key.toLowerCase() === "g") {
         setMyLocationAsStart();
+      } else if (e.key.toLowerCase() === "v") {
+        setViaMode(v => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1268,7 +1339,6 @@ export default function App() {
           className="hamb"
           style={{
             ...styles.hamburger,
-            // en móviles, separa más de los bordes
             left: isMobile ? 10 : styles.hamburger.left,
             padding: isMobile ? "12px 14px" : styles.hamburger.padding,
           }}
@@ -1288,14 +1358,33 @@ export default function App() {
           title="Usar mi ubicación como inicio (g)"
           style={{
             ...styles.geoBtn,
-            // en móvil lo bajo para no chocar con zoom y panel
             top: isMobile ? "auto" : styles.geoBtn.top,
             bottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + 96px)" : "auto",
-            right: isMobile ? 12 : styles.geoBtn.right,
+            right: isMobile ? 12 + 56 : styles.geoBtn.right, // corre para dejar sitio al viaBtn
           }}
           onClick={setMyLocationAsStart}
         >
           📍
+        </button>
+      )}
+
+      {/* ⭐ Botón flotante: Modo colocar PARADA */}
+      {!showSplash && (
+        <button
+          type="button"
+          aria-label="Colocar parada (v)"
+          title="Colocar parada (v)"
+          style={{
+            ...styles.viaBtn,
+            top: isMobile ? "auto" : styles.viaBtn.top,
+            bottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + 36px)" : "auto",
+            right: isMobile ? 12 : styles.viaBtn.right,
+            borderColor: viaMode ? "rgba(167,139,250,0.95)" : "rgba(255,255,255,0.9)",
+            background: viaMode ? "rgba(167,139,250,0.18)" : "rgba(2,10,28,0.9)",
+          }}
+          onClick={() => setViaMode(v => !v)}
+        >
+          {viaMode ? "🟣 Parada: ON" : "◯ Parada"}
         </button>
       )}
 
@@ -1350,6 +1439,12 @@ export default function App() {
             <SearchBox onSelectLocation={(coords) => setEndLoc(coords)} placeholder="Buscar destino..." />
           </div>
 
+          {/* Info de parada manual */}
+          <div style={{ marginBottom: 8, color: "#6b7280", fontSize: 12 }}>
+            Usa el botón flotante <strong>“Parada”</strong> y toca el mapa para colocarla.
+            Puedes arrastrar el marcador y con <em>clic derecho</em> lo quitas.
+          </div>
+
           <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap" }}>
             <select
               value={mode}
@@ -1370,6 +1465,7 @@ export default function App() {
                 setInstructions([]);
                 setActiveInstructionIndex(0);
                 setBottomMode("instructions");
+                setViaMode(false);
               }}
               title="Iniciar navegación (i)"
               aria-label="Iniciar navegación"
@@ -1478,9 +1574,30 @@ export default function App() {
           {/* Doble clic inicio/fin */}
           <MapClickHandler onSetStart={setStartLoc} onSetEnd={setEndLoc} />
 
+          {/* ⭐ Colocar PARADA cuando viaMode está activo */}
+          <MapViaSetter active={viaMode} onSetVia={(coords) => setViaPoints(coords ? [coords] : [])} />
+
           {/* Start/End markers */}
           {startLoc && <Marker position={startLoc}><Popup>Inicio</Popup></Marker>}
           {endLoc && <Marker position={endLoc}><Popup>Destino</Popup></Marker>}
+
+          {/* ⭐ Marker de PARADA */}
+          {viaPoints.length > 0 && (
+            <Marker
+              position={viaPoints[0]}
+              icon={viaIcon}
+              draggable={true}
+              eventHandlers={{
+                dragend: (e) => {
+                  const latlng = e.target.getLatLng();
+                  setViaPoints([[latlng.lat, latlng.lng]]);
+                },
+                contextmenu: () => setViaPoints([]),
+              }}
+            >
+              <Popup>Parada</Popup>
+            </Marker>
+          )}
 
           {/* PREVIEW */}
           {startLoc && endLoc && !isStarted && (
@@ -1582,7 +1699,7 @@ export default function App() {
           )}
         </MapContainer>
 
-        {/* Panel inferior */}
+        {/* Panel inferior (minimizable) */}
         {(previewRoute || route) && (
           (() => {
             const isActive = isStarted;
@@ -1606,8 +1723,89 @@ export default function App() {
                 : "";
 
             const showAltBtn = /ALTO|MEDIO/.test(lbl) && startLoc && endLoc;
+            const showStartBtn = !!previewRoute && !isStarted;
 
-            // ===== Responsive bottom panel style =====
+            // Posicionamiento común para la barra minimizada
+            const miniPosStyle = {
+              left: isMobile ? 8 : bottomPanelLeft,
+              right: isMobile ? 8 : 12,
+              bottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + 8px)" : 14,
+            };
+
+            if (isAlertMinimized) {
+              // ======== VISTA MINIMIZADA ========
+              return (
+                <div
+                  style={{ ...styles.miniBar, ...miniPosStyle, justifyContent: "space-between" }}
+                  className={`${clsPanel}`}
+                  role="region"
+                  aria-label="Panel de alertas minimizado"
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className={`chip level ${chipPulseClass}`} title={`Nivel ${lbl}`}>
+                      <span className={`dot ${levelKey}`} /> {lbl}
+                    </span>
+                    <span className="chip" title="Resumen distancia/tiempo">
+                      🛣️ {dist} • ⏱️ {tim}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {/* Iniciar desde mini-bar (si aplica) */}
+                    {showStartBtn && (
+                      <button
+                        className="btn-primary"
+                        style={{ padding: "8px 10px", borderRadius: 10 }}
+                        onClick={() => {
+                          if (!previewRoute) return alert("Traza primero una ruta (elige inicio y destino).");
+                          setIsStarted(true);
+                          setRoute(null);
+                          setInstructions([]);
+                          setActiveInstructionIndex(0);
+                          setBottomMode("instructions");
+                          setViaMode(false);
+                        }}
+                        title="Iniciar navegación"
+                      >
+                        ▶ Iniciar
+                      </button>
+                    )}
+
+                    {/* Ruta alterna cuando aplica */}
+                    {showAltBtn && (
+                      <button
+                        className="btn-alt"
+                        style={{ padding: "8px 10px", borderRadius: 10 }}
+                        onClick={() => {
+                          const via = suggestAlternateVia();
+                          if (!via) return alert("No encontré una vía alternativa adecuada.");
+                          setViaPoints([via]);
+                          setIsStarted(true);
+                          setBottomMode("instructions");
+                          setViaMode(false);
+                        }}
+                        title="Ruta alterna"
+                      >
+                        ↺ Alterna
+                      </button>
+                    )}
+
+                    {/* Botón restaurar */}
+                    <button
+                      type="button"
+                      style={styles.miniToggleBtn}
+                      onClick={() => setIsAlertMinimized(false)}
+                      title="Expandir panel de alertas"
+                      aria-label="Expandir panel de alertas"
+                    >
+                      ⤢ Expandir
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            // ======== VISTA COMPLETA ========
             const bottomPanelStyle = {
               ...styles.bottomPanel,
               left: isMobile ? 8 : bottomPanelLeft,
@@ -1666,6 +1864,17 @@ export default function App() {
                     >
                       🧩 Resumen
                     </span>
+
+                    {/* Botón para minimizar */}
+                    <button
+                      type="button"
+                      style={{ ...styles.miniToggleBtn }}
+                      onClick={() => setIsAlertMinimized(true)}
+                      title="Minimizar panel de alertas"
+                      aria-label="Minimizar panel de alertas"
+                    >
+                      ⤡ Minimizar
+                    </button>
                   </div>
 
                   {bottomMode === "instructions" ? (
@@ -1744,6 +1953,26 @@ export default function App() {
                     <div className="value">{tim}</div>
                   </div>
 
+                  {/* Botones de acción */}
+                  {showStartBtn && (
+                    <button
+                      className="btn-primary"
+                      style={{ padding: "10px 12px", borderRadius: 10, width: isMobile ? "100%" : "auto" }}
+                      onClick={() => {
+                        if (!previewRoute) return alert("Traza primero una ruta (elige inicio y destino).");
+                        setIsStarted(true);
+                        setRoute(null);
+                        setInstructions([]);
+                        setActiveInstructionIndex(0);
+                        setBottomMode("instructions");
+                        setViaMode(false);
+                      }}
+                      title="Iniciar navegación (i)"
+                    >
+                      Iniciar
+                    </button>
+                  )}
+
                   {showAltBtn && (
                     <button
                       className="btn-alt"
@@ -1754,6 +1983,7 @@ export default function App() {
                         setViaPoints([via]);
                         setIsStarted(true);
                         setBottomMode("instructions");
+                        setViaMode(false);
                       }}
                       title="Crear una ruta alterna que evite la zona de mayor riesgo"
                     >
